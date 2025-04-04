@@ -1,47 +1,43 @@
 package database
 
 import (
-	"database/sql"
+	"ecommerce-api/internal/config"
 	"fmt"
-	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-// NewPostgresConnection establishes a new connection to a PostgreSQL database and returns the connection pool.
-func NewPostgresConnection() (*sql.DB, error) {
-	host := getEnv("DB_HOST", "localhost")
-	port := getEnv("DB_PORT", "5432")
-	user := getEnv("DB_USER", "postgres")
-	password := getEnv("DB_PASSWORD", "postgres")
-	dbname := getEnv("DB_NAME", "ecommerce")
+// NewGormConnection creates a new connection to the PostgreSQL database using GORM
+func NewGormConnection() (*gorm.DB, error) {
+	cfg := config.Load()
 
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		cfg.Database.Host, cfg.Database.Port, cfg.Database.User,
+		cfg.Database.Password, cfg.Database.Name)
 
-	db, err := sql.Open("postgres", connStr)
+	// Configure GORM
+	gormConfig := &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	}
+
+	// Connect to the database
+	db, err := gorm.Open(postgres.Open(dsn), gormConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set connection pool settings
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	// Test the connection
-	if err := db.Ping(); err != nil {
+	// Configure connection pool
+	sqlDB, err := db.DB()
+	if err != nil {
 		return nil, err
 	}
 
-	return db, nil
-}
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-// getEnv retrieves the value of the environment variable named by key or returns fallback if the variable is not found.
-func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return fallback
+	return db, nil
 }

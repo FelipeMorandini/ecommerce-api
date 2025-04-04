@@ -14,7 +14,11 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
+# Copy the binary from the builder stage
 COPY --from=builder /app/ecommerce-api .
+
+# Copy the .env file if it exists (for development)
+COPY --from=builder /app/.env* ./ 2>/dev/null || true
 
 EXPOSE 3000
 
